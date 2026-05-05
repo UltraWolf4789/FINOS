@@ -471,6 +471,57 @@
       gap: 1rem;
     }
 
+    /* ── iframe viewer ── */
+    .iframe-container {
+      display: none;
+      max-width: 1100px;
+      margin: 2rem auto 0;
+      padding: 0 4rem;
+      animation: fadeUp 0.3s ease both;
+    }
+    .iframe-container.visible { display: block; }
+    .iframe-wrapper {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .iframe-bar {
+      background: #0e0e16;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .iframe-url {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 80%;
+    }
+    .iframe-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .iframe-close:hover { color: #ff5f57; background: rgba(255,95,87,0.1); }
+    .iframe-wrapper iframe {
+      width: 100%;
+      height: 620px;
+      border: none;
+      display: block;
+    }
+
     /* ── responsive ── */
     @media (max-width: 768px) {
       nav { padding: 1.2rem 1.5rem; }
@@ -525,6 +576,17 @@
       <span>Enter a URL above to route it through ProxyWave</span>
       <span class="cursor"></span>
     </div>
+  </div>
+</div>
+
+<!-- Iframe Viewer -->
+<div class="iframe-container" id="iframeContainer">
+  <div class="iframe-wrapper">
+    <div class="iframe-bar">
+      <span class="iframe-url" id="iframeUrl"></span>
+      <button class="iframe-close" onclick="closeIframe()">✕</button>
+    </div>
+    <iframe id="proxyFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
   </div>
 </div>
 
@@ -658,10 +720,23 @@
 
     // In production, replace with your deployed proxy server URL
     const proxyBase = 'http://localhost:8080';
+    const proxiedUrl = proxyBase + '/' + encodeURIComponent(url);
+
+    document.getElementById('proxyFrame').src = proxiedUrl;
+    document.getElementById('iframeUrl').textContent = url;
+    document.getElementById('iframeContainer').classList.add('visible');
+
+    // Scroll to iframe
     setTimeout(() => {
-      window.open(proxyBase + '/' + encodeURIComponent(url), '_blank');
-      status.innerHTML = '<span>Request routed via ProxyWave ✓</span>';
+      document.getElementById('iframeContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      status.innerHTML = '<span>Loaded via ProxyWave ✓</span>';
     }, 400);
+  }
+
+  function closeIframe() {
+    document.getElementById('iframeContainer').classList.remove('visible');
+    document.getElementById('proxyFrame').src = '';
+    document.getElementById('widgetStatus').innerHTML = '<span>Enter a URL above to route it through ProxyWave</span><span class="cursor"></span>';
   }
 
   document.getElementById('proxyInput').addEventListener('keydown', e => {

@@ -61,11 +61,14 @@ const server = http.createServer((req, res) => {
   console.log(`[${req.method}] ${targetUrl.href}`);
 
   const proxyReq = lib.request(options, (proxyRes) => {
-    // Forward status and headers
-    res.writeHead(proxyRes.statusCode, {
-      ...proxyRes.headers,
-      "Access-Control-Allow-Origin": "*",
-    });
+    // Copy headers and strip anything that blocks iframe embedding
+    const proxyHeaders = { ...proxyRes.headers };
+    delete proxyHeaders["x-frame-options"];
+    delete proxyHeaders["content-security-policy"];
+    delete proxyHeaders["content-security-policy-report-only"];
+    proxyHeaders["access-control-allow-origin"] = "*";
+
+    res.writeHead(proxyRes.statusCode, proxyHeaders);
     proxyRes.pipe(res);
   });
 

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ProxyWave — Fast Web Proxy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #22223a;
+      --accent: #00f5a0;
+      --accent2: #00b4d8;
+      --text: #e8e8f0;
+      --muted: #6b6b8a;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-head);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── noise grain overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.4;
+    }
+
+    /* ── glow blobs ── */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+    }
+    .blob-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; left: -200px; animation: drift 14s ease-in-out infinite alternate; }
+    .blob-2 { width: 500px; height: 500px; background: var(--accent2); bottom: -150px; right: -150px; animation: drift 18s ease-in-out infinite alternate-reverse; }
+
+    @keyframes drift {
+      from { transform: translate(0, 0); }
+      to   { transform: translate(60px, 40px); }
+    }
+
+    /* ── nav ── */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 4rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(16px);
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .logo span { color: var(--accent); }
+
+    nav ul { list-style: none; display: flex; gap: 2.5rem; }
+    nav ul a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    nav ul a:hover { color: var(--accent); }
+
+    .nav-cta {
+      background: var(--accent);
+      color: #0a0a0f !important;
+      padding: 0.5rem 1.2rem;
+      border-radius: 4px;
+      font-weight: 700 !important;
+      transition: opacity 0.2s !important;
+    }
+    .nav-cta:hover { opacity: 0.85; color: #0a0a0f !important; }
+
+    /* ── hero ── */
+    .hero {
+      padding: 8rem 4rem 6rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(0,245,160,0.08);
+      border: 1px solid rgba(0,245,160,0.25);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 100px;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.6s ease both;
+    }
+    .hero-tag::before { content: '●'; font-size: 0.5rem; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    h1 {
+      font-size: clamp(3rem, 7vw, 6rem);
+      font-weight: 800;
+      line-height: 1.0;
+      letter-spacing: -0.04em;
+      animation: fadeUp 0.6s 0.1s ease both;
+      margin-bottom: 1.5rem;
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.65;
+      animation: fadeUp 0.6s 0.2s ease both;
+      margin-bottom: 3rem;
+      font-family: var(--font-mono);
+      font-weight: 400;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.85rem 2rem;
+      border-radius: 6px;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a0a0f;
+      box-shadow: 0 0 30px rgba(0,245,160,0.25);
+    }
+    .btn-primary:hover { box-shadow: 0 0 40px rgba(0,245,160,0.4); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── proxy widget ── */
+    .proxy-box {
+      margin: 4rem auto 0;
+      max-width: 1100px;
+      padding: 0 4rem;
+      animation: fadeUp 0.6s 0.4s ease both;
+    }
+
+    .proxy-widget {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .widget-bar {
+      background: #0e0e16;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+
+    .widget-url {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0.35rem 0.75rem;
+      gap: 0.5rem;
+      margin-left: 0.75rem;
+    }
+    .widget-url span {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+    .widget-url input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+    .widget-url input::placeholder { color: var(--muted); }
+
+    .widget-go {
+      background: var(--accent);
+      color: #0a0a0f;
+      border: none;
+      border-radius: 5px;
+      padding: 0.35rem 0.9rem;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .widget-go:hover { opacity: 0.8; }
+
+    .widget-body {
+      padding: 2rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .widget-body .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--accent);
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── stats strip ── */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      padding: 4rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin: 5rem 0 0;
+      flex-wrap: wrap;
+    }
+    .stat { text-align: center; }
+    .stat-num {
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-label {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 0.25rem;
+    }
+
+    /* ── features ── */
+    .features {
+      padding: 6rem 4rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 3.5rem;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      transition: border-color 0.2s, transform 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .feature-card:hover { border-color: rgba(0,245,160,0.3); transform: translateY(-4px); }
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+    .feature-card h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+      letter-spacing: -0.02em;
+    }
+    .feature-card p {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    /* ── pricing ── */
+    .pricing {
+      padding: 6rem 4rem;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .pricing-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin-top: 3.5rem;
+    }
+
+    .plan {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      position: relative;
+      transition: transform 0.2s;
+    }
+    .plan:hover { transform: translateY(-4px); }
+    .plan.featured {
+      border-color: var(--accent);
+      box-shadow: 0 0 40px rgba(0,245,160,0.1);
+    }
+
+    .plan-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #0a0a0f;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.25rem 0.8rem;
+      border-radius: 100px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .plan-name {
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+    .plan-price {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      margin-bottom: 0.25rem;
+    }
+    .plan-price sup { font-size: 1.2rem; vertical-align: super; }
+    .plan-price span { font-size: 1rem; color: var(--muted); font-weight: 400; }
+    .plan-desc {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      margin-bottom: 2rem;
+      line-height: 1.5;
+    }
+    .plan-features { list-style: none; margin-bottom: 2rem; }
+    .plan-features li {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .plan-features li::before { content: '✓'; color: var(--accent); font-weight: 700; }
+
+    /* ── footer ── */
+    footer {
+      padding: 3rem 4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    /* ── responsive ── */
+    @media (max-width: 768px) {
+      nav { padding: 1.2rem 1.5rem; }
+      nav ul { display: none; }
+      .hero, .proxy-box, .features, .pricing-inner { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .hero { padding-top: 4rem; }
+      .stats { gap: 2rem; padding: 3rem 1.5rem; }
+      footer { padding: 2rem 1.5rem; flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<!-- Nav -->
+<nav>
+  <div class="logo">Proxy<span>Wave</span></div>
+  <ul>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#pricing" class="nav-cta">Get Started</a></li>
+  </ul>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-tag">Now live — zero setup required</div>
+  <h1>The web,<br/><em>unrestricted.</em></h1>
+  <p class="hero-sub">ProxyWave routes your requests through our fast infrastructure. No installs, no fuss — just paste a URL and go.</p>
+  <div class="hero-actions">
+    <a href="#try" class="btn btn-primary">Try it free</a>
+    <a href="#pricing" class="btn btn-outline">View plans</a>
+  </div>
+</section>
+
+<!-- Proxy Widget -->
+<div class="proxy-box" id="try">
+  <div class="proxy-widget">
+    <div class="widget-bar">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+      <div class="widget-url">
+        <span>https://</span>
+        <input id="proxyInput" type="text" placeholder="example.com/any/path" />
+      </div>
+      <button class="widget-go" onclick="handleProxy()">Go →</button>
+    </div>
+    <div class="widget-body" id="widgetStatus">
+      <span>Enter a URL above to route it through ProxyWave</span>
+      <span class="cursor"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat">
+    <div class="stat-num">99.9%</div>
+    <div class="stat-label">Uptime SLA</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">&lt;50ms</div>
+    <div class="stat-label">Avg latency</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">150+</div>
+    <div class="stat-label">Countries served</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">∞</div>
+    <div class="stat-label">Bandwidth on Pro</div>
+  </div>
+</div>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="section-label">// why proxywave</div>
+  <h2>Everything you need,<br/>nothing you don't.</h2>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Blazing Fast</h3>
+      <p>Optimized routing infrastructure means your requests arrive faster than you can blink.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔑</div>
+      <h3>API Key Access</h3>
+      <p>Integrate ProxyWave into your own apps with a simple API key and REST interface.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <h3>HTTPS Everywhere</h3>
+      <p>All traffic is encrypted end-to-end. Your data never travels in the clear.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Usage Dashboard</h3>
+      <p>Monitor your request volume, response times, and errors in real time.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌍</div>
+      <h3>Global Reach</h3>
+      <p>Access content from any region. Our nodes span 150+ countries worldwide.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔄</div>
+      <h3>CORS Ready</h3>
+      <p>All responses include the correct CORS headers. Plug straight into your frontend.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="pricing" id="pricing">
+  <div class="pricing-inner">
+    <div class="section-label">// plans</div>
+    <h2>Simple, honest pricing.</h2>
+    <div class="pricing-grid">
+      <div class="plan">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price"><sup>$</sup>0<span>/mo</span></div>
+        <div class="plan-desc">Perfect for trying things out or low-volume personal projects.</div>
+        <ul class="plan-features">
+          <li>1,000 requests / month</li>
+          <li>Shared bandwidth</li>
+          <li>CORS support</li>
+          <li>Community support</li>
+        </ul>
+        <a href="#" class="btn btn-outline" style="width:100%;text-align:center">Get started free</a>
+      </div>
+
+      <div class="plan featured">
+        <div class="plan-badge">Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price"><sup>$</sup>9<span>/mo</span></div>
+        <div class="plan-desc">For developers and small teams who need reliable, high-volume access.</div>
+        <ul class="plan-features">
+          <li>100,000 requests / month</li>
+          <li>Priority routing</li>
+          <li>API key access</li>
+          <li>Usage dashboard</li>
+          <li>Email support</li>
+        </ul>
+        <a href="#" class="btn btn-primary" style="width:100%;text-align:center">Start Pro</a>
+      </div>
+
+      <div class="plan">
+        <div class="plan-name">Business</div>
+        <div class="plan-price"><sup>$</sup>29<span>/mo</span></div>
+        <div class="plan-desc">Unlimited scale for teams and production applications.</div>
+        <ul class="plan-features">
+          <li>Unlimited requests</li>
+          <li>Dedicated bandwidth</li>
+          <li>Multi-key management</li>
+          <li>SLA guarantee</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="#" class="btn btn-outline" style="width:100%;text-align:center">Go Business</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="logo" style="font-size:1rem">Proxy<span style="color:var(--accent)">Wave</span></div>
+  <span>© 2026 ProxyWave. All rights reserved.</span>
+  <span>Terms · Privacy · Status</span>
+</footer>
+
+<script>
+  function handleProxy() {
+    const input = document.getElementById('proxyInput').value.trim();
+    const status = document.getElementById('widgetStatus');
+
+    if (!input) {
+      status.innerHTML = '<span style="color:#ff5f57">Please enter a URL first.</span>';
+      return;
+    }
+
+    let url = input.startsWith('http') ? input : 'https://' + input;
+    status.innerHTML = '<span style="color:var(--accent)">Routing request...</span><span class="cursor"></span>';
+
+    // In production, replace with your deployed proxy server URL
+    const proxyBase = 'http://localhost:8080';
+    setTimeout(() => {
+      window.open(proxyBase + '/' + encodeURIComponent(url), '_blank');
+      status.innerHTML = '<span>Request routed via ProxyWave ✓</span>';
+    }, 400);
+  }
+
+  document.getElementById('proxyInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleProxy();
+  });
+</script>
+
+</body>
+</html>
